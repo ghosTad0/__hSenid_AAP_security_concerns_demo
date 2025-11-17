@@ -1,0 +1,29 @@
+- name: Playbook to re-allow port 80 while nginx is up
+  hosts: all
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - ../vars/var_set1.yml
+  tasks:
+    - name: Checking the OS type
+      debug:
+        msg: "{{ ansible_facts['os_family'] }}"
+
+    - name: Nginx installation status
+      ansible.builtin.shell:
+        cmd: systemctl status nginx
+      register: nginx_status_details
+      ignore_errors: yes
+    
+    - name: Re-allow port 80 if nginx is running on RedHat
+      ansible.builtin.shell:
+        cmd: |
+          firewall-cmd --permanent --remove-port=80/tcp &&
+          firewall-cmd --reload
+      when: (nginx_status_details is succeeded) and (ansible_facts['os_family'] == "RedHat")
+
+    - name: Re-allow port 80 if nginx is running on Debian
+      ansible.builtin.shell:
+        cmd: |
+          ufw allow 80/tcp
+      when: (nginx_status_details is succeeded) and (ansible_facts['os_family'] == "Debian")

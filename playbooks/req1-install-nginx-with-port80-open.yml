@@ -1,0 +1,94 @@
+---
+- name: Playbook for installing nginx older version, updating nginx to latest and updating os pkgs
+  hosts: all
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - ../vars/var_set1.yml
+  tasks:
+    - name: Checking the OS type
+      debug:
+        msg: "{{ ansible_facts['os_family'] }}"
+
+    - name: Nginx installation status
+      ansible.builtin.shell:
+        cmd: systemctl status nginx
+      register: nginx_status_details
+      ignore_errors: yes
+
+    # No error, uninstall nginx
+    - name: Nginx Uninstallation if found and os release matches to RedHat
+      shell:
+        cmd: |
+          yum remove nginx -y &&
+          # yum purge nginx -y &&
+          yum autoremove -y
+      ignore_errors: yes
+      when: (nginx_status_details is succeeded) and (ansible_facts['os_family'] == "RedHat")
+
+    - name: Nginx Uninstallation if found and os release matches to Debian
+      shell:
+        cmd: |
+          apt remove nginx -y &&
+          apt purge nginx -y &&
+          apt autoremove -y
+      ignore_errors: yes
+      when: (nginx_status_details is succeeded) and (ansible_facts['os_family'] == "Debian")
+
+    - name: Remove folder structure used by nginx
+      ansible.builtin.file:
+        path: /etc/nginx
+        state: absent
+
+    # Now properly install nginx version
+    - name: install nginx (if Debian)
+      apt:
+        name: nginx
+        state: latest
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: install nginx (if RedHat)
+      # yum:
+      #   name: nginx
+      #   state: latest
+      shell:
+        cmd: |
+          yum module enable nginx:stream_version
+          yum install nginx -y
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: starting nginx service
+      service:
+        name: nginx
+        state: started
+      register: nginx_installation_details
+
+    - name: Copy nginx config to /etc/nginx/conf.d
+          # ansible.builtin.copy:
+          #   src: "../assets/employee_app_nginx.conf"
+          #   dest: /etc/nginx/conf.d
+      ansible.builtin.template:
+        src: "../templates/demo_conf1.conf.j2"
+        dest: /etc/nginx/conf.d/demo_conf1.conf
+      #notify: Restart nginx
+
+    - name: Copy demo html file to /var/www/html
+      ansible.builtin.copy:
+        src: "../assets/{{ demo_html_filename }}"
+        dest: /var/www/html/{{ demo_html_filename }}
+
+    - name: Allowing ports task execution for RedHat
+      block:
+        - name: Allow the firewall the 80 port
+          ansible.builtin.shell:
+            cmd: firewall-cmd --add-port=80/tcp --permanent
+
+        - name: Disable the SELinux for the server (stackoverflow suggestion https://stackoverflow.com/questions/23948527/13-permission-denied-while-connecting-to-upstreamnginx)
+          ansible.builtin.shell:
+            cmd: setsebool -P httpd_can_network_connect 1
+      when: ansible_facts['os_family'] == "RedHat"  #For ubuntu not needed for now
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
