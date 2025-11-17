@@ -72,6 +72,11 @@
         dest: /etc/nginx/conf.d/demo_conf1.conf
       #notify: Restart nginx
 
+    - name: Create /var/www/html directory if not present
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+
     - name: Copy demo html file to /var/www/html
       ansible.builtin.copy:
         src: "../assets/{{ demo_html_filename }}"
