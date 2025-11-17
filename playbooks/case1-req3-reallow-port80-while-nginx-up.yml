@@ -18,7 +18,7 @@
     - name: Re-allow port 80 if nginx is running on RedHat
       ansible.builtin.shell:
         cmd: |
-          firewall-cmd --permanent --remove-port=81/tcp &&
+          firewall-cmd --permanent --add-port=81/tcp &&
           firewall-cmd --reload
       when: (nginx_status_details is succeeded) and (ansible_facts['os_family'] == "RedHat")
 
