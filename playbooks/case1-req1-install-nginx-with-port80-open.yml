@@ -86,7 +86,10 @@
       block:
         - name: Allow the firewall the 80 port
           ansible.builtin.shell:
-            cmd: firewall-cmd --add-port=81/tcp --permanent
+            cmd: |
+              firewall-cmd --add-port=80/tcp --permanent
+              firewall-cmd --add-port=81/tcp --permanent
+              firewall-cmd --reload
 
         - name: Disable the SELinux for the server (stackoverflow suggestion https://stackoverflow.com/questions/23948527/13-permission-denied-while-connecting-to-upstreamnginx)
           ansible.builtin.shell:
